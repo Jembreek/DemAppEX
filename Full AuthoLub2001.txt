@@ -1,0 +1,1170 @@
+CREATE DATABASE AuthoLub2001;
+GO
+
+USE AuthoLub2001;
+GO
+
+CREATE TABLE CodeFiles (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    FileName NVARCHAR(100),
+    Code NVARCHAR(MAX)
+);
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES 
+('AppDbContext.cs', 
+'using System.Data.Entity;
+
+namespace DemoExApp.Models
+{
+    public class AppDbContext : DbContext
+    {
+        public AppDbContext() : base("name=DefaultConnection") { }
+
+        public DbSet<User> Users { get; set; }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<Order> Orders { get; set; }
+        public DbSet<Point> Points { get; set; }
+    }
+}'),
+
+('User.cs',
+'namespace DemoExApp.Models
+{
+    public class User
+    {
+        public int Id { get; set; }
+        public string Role { get; set; }
+        public string FullName { get; set; }
+        public string Login { get; set; }
+        public string Password { get; set; }
+    }
+}'),
+
+('Product.cs',
+'using System.ComponentModel.DataAnnotations;
+
+namespace DemoExApp.Models
+{
+    public class Product
+    {
+        [Key]
+        public string Article { get; set; }
+        public string Name { get; set; }
+        public string Unit { get; set; }
+        public decimal Price { get; set; }
+        public string Supplier { get; set; }
+        public string Manufacturer { get; set; }
+        public string Category { get; set; }
+        public int Discount { get; set; }
+        public int Quantity { get; set; }
+        public string Description { get; set; }
+        public string PhotoPath { get; set; }
+    }
+}'),
+
+('Point.cs',
+'namespace DemoExApp.Models
+{
+    public class Point
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
+}'),
+
+('Order.cs',
+'using System;
+
+namespace DemoExApp.Models
+{
+    public class Order
+    {
+        public int Id { get; set; }
+        public DateTime OrderDate { get; set; }
+        public DateTime DeliveryDate { get; set; }
+        public int PointId { get; set; }
+        public int UserId { get; set; }
+        public string Status { get; set; }
+
+        public virtual Point Point { get; set; }
+        public virtual User User { get; set; }
+    }
+}');
+GO
+
+USE AuthoLub2001;
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES
+
+('AdminPage.xaml', N'<Page x:Class="DemoExApp.Pages.AdminPage"
+...
+</Page>'),
+
+('AdminPage.xaml.cs', N'using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Data.Entity;
+using DemoExApp.Models;
+
+namespace DemoExApp.Pages
+{
+    public partial class AdminPage : Page
+    {
+        private List<Product> _allProducts;
+        public AdminPage(string fullName)
+        {
+            InitializeComponent();
+            FullNameTextBlock.Text = fullName;
+            LoadData();
+        }
+
+        private void LoadData()
+        {
+            using (var db = new AppDbContext())
+            {
+                _allProducts = db.Products.ToList();
+
+                foreach (var p in _allProducts)
+                    if (string.IsNullOrEmpty(p.PhotoPath))
+                        p.PhotoPath = "/Images/picture.png";
+
+                ProductsListView.ItemsSource = _allProducts;
+                OrdersListView.ItemsSource = db.Orders
+                    .Include(o => o.User)
+                    .Include(o => o.Point)
+                    .ToList();
+            }
+        }
+
+        private void ExitButton_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService.GoBack();
+        }
+    }
+}'),
+
+('AuthPage.xaml', N'<Page x:Class="DemoExApp.Pages.AuthPage"
+...
+</Page>'),
+
+('AuthPage.xaml.cs', N'using System;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using DemoExApp.Models;
+
+namespace DemoExApp.Pages
+{
+    public partial class AuthPage : Page
+    {
+        public AuthPage()
+        {
+            InitializeComponent();
+        }
+
+        private void AuthButton_Click(object sender, RoutedEventArgs e)
+        {
+            using (var db = new AppDbContext())
+            {
+                var user = db.Users.FirstOrDefault(u =>
+                    u.Login == LoginTextBox.Text &&
+                    u.Password == PasswordTextBox.Text);
+
+                if (user != null)
+                {
+                    if (user.Role == "Администратор")
+                        NavigationService.Navigate(new AdminPage(user.FullName));
+                    else if (user.Role == "Менеджер")
+                        NavigationService.Navigate(new ManagerPage(user.FullName));
+                    else
+                        NavigationService.Navigate(new ClientPage(user.FullName));
+                }
+                else
+                    MessageBox.Show("Неверный логин или пароль");
+            }
+        }
+    }
+}'),
+
+('ClientPage.xaml', N'<Page x:Class="DemoExApp.Pages.ClientPage"
+...
+</Page>'),
+
+('ClientPage.xaml.cs', N'using DemoExApp.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+
+namespace DemoExApp.Pages
+{
+    public partial class ClientPage : Page
+    {
+        public List<Product> _allProducts;
+
+        public ClientPage(string fullName)
+        {
+            InitializeComponent();
+            FullNameTextBlock.Text = fullName;
+            LoadProducts();
+        }
+
+        void LoadProducts()
+        {
+            using (var db = new AppDbContext())
+            {
+                _allProducts = db.Products.ToList();
+            }
+
+            ProductsListView.ItemsSource = _allProducts;
+        }
+    }
+}'),
+
+('GuestPage.xaml', N'<Page x:Class="DemoExApp.Pages.GuestPage"
+...
+</Page>'),
+
+('GuestPage.xaml.cs', N'using DemoExApp.Models;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Controls;
+
+namespace DemoExApp.Pages
+{
+    public partial class GuestPage : Page
+    {
+        public List<Product> _allProducts;
+
+        public GuestPage()
+        {
+            InitializeComponent();
+            LoadProducts();
+        }
+
+        void LoadProducts()
+        {
+            using (var db = new AppDbContext())
+            {
+                _allProducts = db.Products.ToList();
+            }
+
+            ProductsListView.ItemsSource = _allProducts;
+        }
+    }
+}'),
+
+('ManagerPage.xaml', N'<Page x:Class="DemoExApp.Pages.ManagerPage"
+...
+</Page>'),
+
+('ManagerPage.xaml.cs', N'using DemoExApp.Models;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Data.Entity;
+
+namespace DemoExApp.Pages
+{
+    public partial class ManagerPage : Page
+    {
+        public List<Product> _allProducts;
+
+        public ManagerPage(string fullName)
+        {
+            InitializeComponent();
+            FullNameTextBlock.Text = fullName;
+            LoadProducts();
+            LoadOrders();
+        }
+
+        void LoadProducts()
+        {
+            using (var db = new AppDbContext())
+            {
+                _allProducts = db.Products.ToList();
+            }
+
+            ProductsListView.ItemsSource = _allProducts;
+        }
+
+        void LoadOrders()
+        {
+            using (var db = new AppDbContext())
+            {
+                OrdersListView.ItemsSource = db.Orders
+                    .Include(o => o.User)
+                    .Include(o => o.Point)
+                    .ToList();
+            }
+        }
+    }
+}');
+GO
+
+USE AuthoLub2001;
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES
+('AdminPage.xaml', N'<Page x:Class="DemoExApp.Pages.AdminPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:DemoExApp.Pages"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="AdminPage">
+
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Left" Orientation="Horizontal" VerticalAlignment="Center">
+            <Image Source="/Images/Icon.png" Width="40" Margin="10,0,0,0"/>
+            <TextBlock Text="Страница администратора" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="24"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Right" Margin="10" Orientation="Horizontal">
+            <TextBlock x:Name="FullNameTextBlock" Text="ФИО" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Button x:Name="ExitButton" Content="Выйти" Click="ExitButton_Click" Width="50"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="1" Margin="0,10,0,0">
+            <TabItem Header="Товары">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="#7FFF00" Margin="10" Grid.Column="0">
+                        <StackPanel Margin="10" Orientation="Vertical">
+                            <Label Content="Поиск:"/>
+                            <TextBox x:Name="SearchTextBox" TextChanged="SearchTextBox_TextChanged"/>
+                            <Label Content="Поставщик:"/>
+                            <ComboBox x:Name="SupplierComboBox" SelectedIndex="0" SelectionChanged="SupplierComboBox_SelectionChanged">
+                                <ComboBoxItem Content="Все поставщики"/>
+                                <ComboBoxItem Content="Kari"/>
+                                <ComboBoxItem Content="Обувь для вас"/>
+                            </ComboBox>
+                            <Label Content="Количество:"/>
+                            <ComboBox x:Name="QuantityComboBox" SelectedIndex="0" SelectionChanged="QuantityComboBox_SelectionChanged">
+                                <ComboBoxItem Content="По убыванию"/>
+                                <ComboBoxItem Content="По возрастанию"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </Border>
+
+                    <ListView x:Name="ProductsListView" Grid.Column="1" Margin="0,10,10,10" Background="#7FFF00" HorizontalContentAlignment="Stretch">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="White">
+                                    <StackPanel Orientation="Horizontal" Margin="10">
+                                        <Image Source="{Binding PhotoPath}" Width="100" Margin="10"/>
+
+                                        <StackPanel Orientation="Vertical">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Category}"/>
+                                                <TextBlock Text=" | "/>
+                                                <TextBlock Text="{Binding Name}"/>
+                                            </StackPanel>
+                                            <TextBlock TextWrapping="Wrap" Width="350" Text="{Binding Description, StringFormat=''Описание товара: {0}''}"/>
+                                            <TextBlock Text="{Binding Manufacturer, StringFormat=''Производитель: {0}''}"/>
+                                            <TextBlock Text="{Binding Supplier, StringFormat=''Поставщик: {0}''}"/>
+                                            <TextBlock Text="{Binding Price, StringFormat=''Цена: {0}''}"/>
+                                            <TextBlock Text="{Binding Unit, StringFormat=''Единица измерения: {0}''}"/>
+                                            <TextBlock Text="{Binding Quantity, StringFormat=''Количество на складе: {0}''}"/>
+                                        </StackPanel>
+
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Discount, StringFormat='' {0}%''}" FontSize="40"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Заказы">
+                <Grid>
+                    <ListView x:Name="OrdersListView" Margin="10" Background="#7FFF00" HorizontalContentAlignment="Stretch">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="White">
+                                    <StackPanel Orientation="Vertical" Margin="10">
+                                        <TextBlock Text="{Binding OrderDate, StringFormat=''Дата заказа: {0}''}"/>
+                                        <TextBlock Text="{Binding DeliveryDate, StringFormat=''Дата доставки: {0}''}"/>
+                                        <TextBlock Text="{Binding Point.Name, StringFormat=''Пункт выдачи: {0}''}"/>
+                                        <TextBlock Text="{Binding User.FullName, StringFormat=''Имя пользователя: {0}''}"/>
+                                        <TextBlock Text="{Binding Status, StringFormat=''Статус: {0}''}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+    </Grid>
+</Page>'),
+
+('AdminPage.xaml.cs', N'using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Data.Entity;
+using DemoExApp.Models;
+
+namespace DemoExApp.Pages
+{
+    public partial class AdminPage : Page
+    {
+        private List<Product> _allProducts;
+        public AdminPage(string fullName) { InitializeComponent(); FullNameTextBlock.Text = fullName; LoadData(); }
+
+        private void LoadData()
+        {
+            using (var db = new AppDbContext())
+            {
+                _allProducts = db.Products.ToList();
+                foreach (var p in _allProducts)
+                    if (string.IsNullOrEmpty(p.PhotoPath)) p.PhotoPath = "/Images/picture.png";
+
+                ProductsListView.ItemsSource = _allProducts;
+                OrdersListView.ItemsSource = db.Orders.Include(o => o.User).Include(o => o.Point).ToList();
+            }
+        }
+
+        private void ApplyFilters()
+        {
+            if (_allProducts == null) return;
+            var filter = _allProducts.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
+                filter = filter.Where(p => p.Name.ToLower().Contains(SearchTextBox.Text.ToLower()));
+
+            if (SupplierComboBox.SelectedIndex == 1) filter = filter.Where(p => p.Supplier == "Kari");
+            if (SupplierComboBox.SelectedIndex == 2) filter = filter.Where(p => p.Supplier == "Обувь для вас");
+
+            if (QuantityComboBox.SelectedIndex == 0) filter = filter.OrderBy(p => p.Quantity);
+            else if (QuantityComboBox.SelectedIndex == 1) filter = filter.OrderByDescending(p => p.Quantity);
+
+            ProductsListView.ItemsSource = filter.ToList();
+        }
+
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilters();
+        private void SupplierComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilters();
+        private void QuantityComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilters();
+        private void ExitButton_Click(object sender, RoutedEventArgs e) => NavigationService.GoBack();
+    }
+}');
+GO
+
+USE AuthoLub2001;
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES
+
+('AuthPage.xaml', N'<Page x:Class="DemoExApp.Pages.AuthPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:DemoExApp.Pages"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="AuthPage">
+
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Left" Orientation="Horizontal" VerticalAlignment="Center">
+            <Image Source="/Images/Icon.png" Width="40" Margin="10,0,0,0"/>
+            <TextBlock Text="Страница авторизации" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="24"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Margin="10" Background="#7FFF00">
+            <StackPanel Margin="10">
+                <Label Content="Логин:"/>
+                <TextBox x:Name="LoginTextBox"/>
+                <Label Content="Пароль:"/>
+                <TextBox x:Name="PasswordTextBox"/>
+
+                <Button x:Name="AuthButton" Content="Войти" Click="AuthButton_Click" Height="20" Margin="0,10,0,0"/>
+                <Button x:Name="GuestButton" Content="Войти как гость" Click="GuestButton_Click" Height="20" Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</Page>'),
+
+('AuthPage.xaml.cs', N'using System;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using DemoExApp.Models;
+
+namespace DemoExApp.Pages
+{
+    public partial class AuthPage : Page
+    {
+        public AuthPage() { InitializeComponent(); }
+
+        private void AuthButton_Click(object sender, RoutedEventArgs e)
+        {
+            using (var db = new AppDbContext())
+            {
+                var user = db.Users.FirstOrDefault(u => u.Login == LoginTextBox.Text && u.Password == PasswordTextBox.Text);
+                if (user != null)
+                {
+                    if (user.Role == "Администратор") NavigationService.Navigate(new AdminPage(user.FullName));
+                    else if (user.Role == "Менеджер") NavigationService.Navigate(new ManagerPage(user.FullName));
+                    else NavigationService.Navigate(new ClientPage(user.FullName));
+                }
+                else MessageBox.Show("Неверный логин или пароль");
+            }
+        }
+
+        private void GuestButton_Click(object sender, RoutedEventArgs e) => NavigationService.Navigate(new GuestPage());
+    }
+}');
+GO
+
+USE AuthoLub2001;
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES
+
+('ClientPage.xaml', N'<Page x:Class="DemoExApp.Pages.ClientPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:DemoExApp.Pages"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="ClientPage">
+
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Left" Orientation="Horizontal" VerticalAlignment="Center">
+            <Image Source="/Images/Icon.png" Width="40" Margin="10,0,0,0"/>
+            <TextBlock Text="Страница клиента" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="24"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Right" Margin="10" Orientation="Horizontal">
+            <TextBlock x:Name="FullNameTextBlock" Text="ФИО" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Button x:Name="ExitButton" Content="Выйти" Click="ExitButton_Click" Width="50"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <ListView x:Name="ProductsListView" Margin="10" Background="#7FFF00" HorizontalContentAlignment="Stretch">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="White">
+                            <StackPanel Orientation="Horizontal" Margin="10">
+                                <Image Source="{Binding PhotoPath}" Width="100" Margin="10"/>
+
+                                <StackPanel Orientation="Vertical">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Category}"/>
+                                        <TextBlock Text=" | "/>
+                                        <TextBlock Text="{Binding Name}"/>
+                                    </StackPanel>
+                                    <TextBlock TextWrapping="Wrap" Width="350" Text="{Binding Description, StringFormat=''Описание товара: {0}''}"/>
+                                    <TextBlock Text="{Binding Manufacturer, StringFormat=''Производитель: {0}''}"/>
+                                    <TextBlock Text="{Binding Supplier, StringFormat=''Поставщик: {0}''}"/>
+                                    <TextBlock Text="{Binding Price, StringFormat=''Цена: {0}''}"/>
+                                    <TextBlock Text="{Binding Unit, StringFormat=''Единица измерения: {0}''}"/>
+                                    <TextBlock Text="{Binding Quantity, StringFormat=''Количество на складе: {0}''}"/>
+                                </StackPanel>
+
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Discount, StringFormat='' {0}%''}" FontSize="40"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+
+    </Grid>
+</Page>'),
+
+('ClientPage.xaml.cs', N'using DemoExApp.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+
+namespace DemoExApp.Pages
+{
+    /// <summary>
+    /// Логика взаимодействия для ClientPage.xaml
+    /// </summary>
+    public partial class ClientPage : Page
+    {
+        public List<Product> _allProducts;
+
+        public ClientPage(string fullName)
+        {
+            InitializeComponent();
+            FullNameTextBlock.Text = fullName;
+
+            LoadProducts();
+        }
+
+        void LoadProducts()
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    _allProducts = db.Products.ToList();
+
+                    foreach (var product in _allProducts)
+                    {
+                        if (product.PhotoPath == "")
+                            product.PhotoPath = "/Images/picture.png";
+                    }
+                }
+
+                ProductsListView.ItemsSource = _allProducts.ToList();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка подключения: {ex}");
+            }
+        }
+
+        private void ExitButton_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBoxResult result = MessageBox.Show
+                ($"Вы уверены, что хотите выйти?", "Выход из аккаунта", MessageBoxButton.YesNo);
+            if (result == MessageBoxResult.Yes)
+                NavigationService.GoBack();
+        }
+    }
+}');
+GO
+
+USE AuthoLub2001;
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES
+
+('GuestPage.xaml', N'<Page x:Class="DemoExApp.Pages.GuestPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:DemoExApp.Pages"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="GuestPage">
+
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Left" Orientation="Horizontal" VerticalAlignment="Center">
+            <Image Source="/Images/Icon.png" Width="40" Margin="10,0,0,0"/>
+            <TextBlock Text="Страница клиента" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="24"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Right" Margin="10" Orientation="Horizontal">
+            <Button x:Name="ExitButton" Content="Выйти" Click="ExitButton_Click" Width="50"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <ListView x:Name="ProductsListView" Margin="10" Background="#7FFF00" HorizontalContentAlignment="Stretch">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="White">
+                            <StackPanel Orientation="Horizontal" Margin="10">
+                                <Image Source="{Binding PhotoPath}" Width="100" Margin="10"/>
+
+                                <StackPanel Orientation="Vertical">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Category}"/>
+                                        <TextBlock Text=" | "/>
+                                        <TextBlock Text="{Binding Name}"/>
+                                    </StackPanel>
+                                    <TextBlock TextWrapping="Wrap" Width="350" Text="{Binding Description, StringFormat=''Описание товара: {0}''}"/>
+                                    <TextBlock Text="{Binding Manufacturer, StringFormat=''Производитель: {0}''}"/>
+                                    <TextBlock Text="{Binding Supplier, StringFormat=''Поставщик: {0}''}"/>
+                                    <TextBlock Text="{Binding Price, StringFormat=''Цена: {0}''}"/>
+                                    <TextBlock Text="{Binding Unit, StringFormat=''Единица измерения: {0}''}"/>
+                                    <TextBlock Text="{Binding Quantity, StringFormat=''Количество на складе: {0}''}"/>
+                                </StackPanel>
+
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Discount, StringFormat='' {0}%''}" FontSize="40"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+
+    </Grid>
+</Page>'),
+
+('GuestPage.xaml.cs', N'using DemoExApp.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+
+namespace DemoExApp.Pages
+{
+    /// <summary>
+    /// Логика взаимодействия для GuestPage.xaml
+    /// </summary>
+    public partial class GuestPage : Page
+    {
+        public List<Product> _allProducts;
+
+        public GuestPage()
+        {
+            InitializeComponent();
+
+            LoadProducts();
+        }
+
+        void LoadProducts()
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    _allProducts = db.Products.ToList();
+
+                    foreach (var product in _allProducts)
+                    {
+                        if (product.PhotoPath == "")
+                            product.PhotoPath = "/Images/picture.png";
+                    }
+                }
+
+                ProductsListView.ItemsSource = _allProducts.ToList();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка подключения: {ex}");
+            }
+        }
+
+        private void ExitButton_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBoxResult result = MessageBox.Show
+                ($"Вы уверены, что хотите выйти?", "Выход из аккаунта", MessageBoxButton.YesNo);
+            if (result == MessageBoxResult.Yes)
+                NavigationService.GoBack();
+        }
+    }
+}');
+GO
+
+USE AuthoLub2001;
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES
+
+('ManagerPage.xaml', N'<Page x:Class="DemoExApp.Pages.ManagerPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:DemoExApp.Pages"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="ManagerPage">
+
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Left" Orientation="Horizontal" VerticalAlignment="Center">
+            <Image Source="/Images/Icon.png" Width="40" Margin="10,0,0,0"/>
+            <TextBlock Text="Страница менеджера" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="24"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Right" Margin="10" Orientation="Horizontal">
+            <TextBlock x:Name="FullNameTextBlock" Text="ФИО" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Button x:Name="ExitButton" Content="Выйти" Click="ExitButton_Click" Width="50"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="1" Margin="0,10,0,0">
+            <TabItem Header="Товары">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="#7FFF00" Margin="10" Grid.Column="0">
+                        <StackPanel Margin="10" Orientation="Vertical">
+                            <Label Content="Поиск:"/>
+                            <TextBox x:Name="SearchTextBox" TextChanged="SearchTextBox_TextChanged"/>
+                            <Label Content="Поставщик:"/>
+                            <ComboBox x:Name="SupplierComboBox" SelectedIndex="0" SelectionChanged="SupplierComboBox_SelectionChanged">
+                                <ComboBoxItem Content="Все поставщики"/>
+                                <ComboBoxItem Content="Kari"/>
+                                <ComboBoxItem Content="Обувь для вас"/>
+                            </ComboBox>
+                            <Label Content="Количество:"/>
+                            <ComboBox x:Name="QuantityComboBox" SelectedIndex="0" SelectionChanged="QuantityComboBox_SelectionChanged">
+                                <ComboBoxItem Content="По убыванию"/>
+                                <ComboBoxItem Content="По возрастанию"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </Border>
+
+                    <ListView x:Name="ProductsListView" Grid.Column="1" Margin="0,10,10,10" Background="#7FFF00" HorizontalContentAlignment="Stretch">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="White">
+                                    <StackPanel Orientation="Horizontal" Margin="10">
+                                        <Image Source="{Binding PhotoPath}" Width="100" Margin="10"/>
+
+                                        <StackPanel Orientation="Vertical">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Category}"/>
+                                                <TextBlock Text=" | "/>
+                                                <TextBlock Text="{Binding Name}"/>
+                                            </StackPanel>
+                                            <TextBlock TextWrapping="Wrap" Width="350" Text="{Binding Description, StringFormat=''Описание товара: {0}''}"/>
+                                            <TextBlock Text="{Binding Manufacturer, StringFormat=''Производитель: {0}''}"/>
+                                            <TextBlock Text="{Binding Supplier, StringFormat=''Поставщик: {0}''}"/>
+                                            <TextBlock Text="{Binding Price, StringFormat=''Цена: {0}''}"/>
+                                            <TextBlock Text="{Binding Unit, StringFormat=''Единица измерения: {0}''}"/>
+                                            <TextBlock Text="{Binding Quantity, StringFormat=''Количество на складе: {0}''}"/>
+                                        </StackPanel>
+
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Discount, StringFormat='' {0}%''}" FontSize="40"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Заказы">
+                <Grid>
+                    <ListView x:Name="OrdersListView" Margin="10" Background="#7FFF00" HorizontalContentAlignment="Stretch">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="White">
+                                    <StackPanel Orientation="Vertical" Margin="10">
+                                        <TextBlock Text="{Binding OrderDate, StringFormat=''Дата заказа: {0}''}"/>
+                                        <TextBlock Text="{Binding DeliveryDate, StringFormat=''Дата доставки: {0}''}"/>
+                                        <TextBlock Text="{Binding Point.Name, StringFormat=''Пункт выдачи: {0}''}"/>
+                                        <TextBlock Text="{Binding User.FullName, StringFormat=''Имя пользователя: {0}''}"/>
+                                        <TextBlock Text="{Binding Status, StringFormat=''Статус: {0}''}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+    </Grid>
+</Page>'),
+
+('ManagerPage.xaml.cs', N'using DemoExApp.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+using System.Data.Entity;
+
+namespace DemoExApp.Pages
+{
+    /// <summary>
+    /// Логика взаимодействия для ManagerPage.xaml
+    /// </summary>
+    public partial class ManagerPage : Page
+    {
+        public List<Product> _allProducts;
+
+        public ManagerPage(string fullName)
+        {
+            InitializeComponent();
+            FullNameTextBlock.Text = fullName;
+
+            LoadProducts();
+            LoadOrders();
+            ApplyFilters();
+        }
+
+        void LoadProducts()
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    _allProducts = db.Products.ToList();
+
+                    foreach (var product in _allProducts)
+                    {
+                        if (product.PhotoPath == "")
+                            product.PhotoPath = "/Images/picture.png";
+                    }
+                }
+
+                ProductsListView.ItemsSource = _allProducts.ToList();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка подключения: {ex}");
+            }
+        }
+
+        void LoadOrders()
+        {
+            try
+            {
+                using (var db = new AppDbContext())
+                {
+                    OrdersListView.ItemsSource = db.Orders
+                        .Include(o => o.User)
+                        .Include(o => o.Point)
+                        .ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка подключения: {ex}");
+            }
+        }
+
+        void ApplyFilters()
+        {
+            if (_allProducts == null) return;
+
+            var filterProducts = _allProducts.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
+            {
+                var searchText = SearchTextBox.Text.ToLower();
+
+                filterProducts = filterProducts.Where(p =>
+                p.Name.ToLower().Contains(searchText) ||
+                p.Description.ToLower().Contains(searchText) ||
+                p.Category.ToLower().Contains(searchText) ||
+                p.Manufacturer.ToLower().Contains(searchText) ||
+                p.Supplier.ToLower().Contains(searchText) ||
+                p.Unit.ToLower().Contains(searchText));
+            }
+
+            int supplierIndex = SupplierComboBox.SelectedIndex;
+
+            if (supplierIndex == 0)
+                filterProducts = filterProducts.OrderBy(p => p.Name);
+            if (supplierIndex == 1)
+                filterProducts = filterProducts.Where(p => p.Supplier == "Kari");
+            if (supplierIndex == 2)
+                filterProducts = filterProducts.Where(p => p.Supplier == "Обувь для вас");
+
+            int quantityIndex = QuantityComboBox.SelectedIndex;
+
+            if (quantityIndex == 0)
+                filterProducts = filterProducts.OrderBy(p => p.Quantity);
+            if (quantityIndex == 1)
+                filterProducts = filterProducts.OrderByDescending(p => p.Quantity);
+
+            ProductsListView.ItemsSource = filterProducts.ToList();
+        }
+
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private void SupplierComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private void QuantityComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private void ExitButton_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBoxResult result = MessageBox.Show
+                ($"Вы уверены, что хотите выйти?", "Выход из аккаунта", MessageBoxButton.YesNo);
+            if (result == MessageBoxResult.Yes)
+                NavigationService.GoBack();
+        }
+    }
+}');
+GO
+
+USE AuthoLub2001;
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES
+('DB', N'CREATE DATABASE DBOnee;
+GO
+
+USE DBOnee;
+GO
+
+-- =========================
+-- Таблица товаров
+-- =========================
+CREATE TABLE Products (
+    Article NVARCHAR(50) PRIMARY KEY,
+    Name NVARCHAR(150) NOT NULL,
+    Unit NVARCHAR(50) NOT NULL,
+    Price DECIMAL(18,2) NOT NULL CHECK (Price >= 0),
+    Supplier NVARCHAR(150) NOT NULL,
+    Manufacturer NVARCHAR(150) NOT NULL,
+    Category NVARCHAR(100) NOT NULL,
+    Discount INT DEFAULT 0 CHECK (Discount >= 0 AND Discount <= 100),
+    Quantity INT NOT NULL CHECK (Quantity >= 0),
+    Description NVARCHAR(MAX),
+    PhotoPath NVARCHAR(255)  -- путь к изображению
+);
+GO
+
+-- =========================
+-- Таблица пользователей
+-- =========================
+CREATE TABLE Users (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Role NVARCHAR(50) NOT NULL,
+    FullName NVARCHAR(255) NOT NULL,
+    Login NVARCHAR(100) NOT NULL UNIQUE,
+    Password NVARCHAR(100) NOT NULL
+);
+GO
+
+-- =========================
+-- Таблица пунктов выдачи
+-- =========================
+CREATE TABLE Points (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(255) NOT NULL
+);
+GO
+
+-- =========================
+-- Таблица заказов
+-- =========================
+CREATE TABLE Orders (
+    Id INT PRIMARY KEY,
+    OrderDate DATE NOT NULL,
+    DeliveryDate DATE NOT NULL,
+    PointId INT NOT NULL,
+    UserId INT NOT NULL,
+    Status NVARCHAR(100) NOT NULL,
+
+    CONSTRAINT FK_Orders_Points
+        FOREIGN KEY (PointId) REFERENCES Points(Id),
+
+    CONSTRAINT FK_Orders_Users
+        FOREIGN KEY (UserId) REFERENCES Users(Id),
+
+    CONSTRAINT CHK_DeliveryDate
+        CHECK (DeliveryDate >= OrderDate)
+);
+GO
+
+-- =========================
+-- Таблица позиций заказа
+-- =========================
+CREATE TABLE OrderItems (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    ProductArticle NVARCHAR(50) NOT NULL,
+    Quantity INT NOT NULL CHECK (Quantity > 0),
+    OrderId INT NOT NULL,
+
+    CONSTRAINT FK_OrderItems_Product
+        FOREIGN KEY (ProductArticle) REFERENCES Products(Article),
+
+    CONSTRAINT FK_OrderItems_Order
+        FOREIGN KEY (OrderId) REFERENCES Orders(Id)
+);
+GO
+');
+GO
+
+USE AuthoLub2001;
+GO
+
+INSERT INTO CodeFiles (FileName, Code) VALUES
+
+('App.config', N'<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<connectionStrings>
+		<add name="DefaultConnection"
+			 connectionString="Data Source=ilabsqlw19s1, 49172;Initial Catalog=DBOnee;Integrated Security=True;"
+			 providerName="System.Data.SqlClient" />
+	</connectionStrings>
+</configuration>
+');
+GO
